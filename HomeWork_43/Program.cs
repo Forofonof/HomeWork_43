@@ -5,17 +5,29 @@ class Program
 {
     static void Main(string[] args)
     {
-        Station station = new Station();
-        station.Work();
+        Direction direction = new Direction();
+        TicketOffice ticketOffice = new TicketOffice(direction);
+        TrainDepot trainDepot = new TrainDepot();
+        Wagon wagon = new Wagon();
+        Station station = new Station(direction, ticketOffice, trainDepot, wagon);
+        Menu menu = new Menu(direction, ticketOffice, station);
+        
+        menu.Work();
     }
 }
 
-class Station
+class Menu
 {
-    private int _numbersPassengers;
-    private string _endpoint;
-    private Random _random = new Random();
-    private List<int> _train = new List<int>();
+    private Station _station;
+    private TicketOffice _ticketOffice;
+    private Direction _direction;
+
+    public Menu(Direction direction, TicketOffice ticketOffice, Station station)
+    {
+        _direction = direction;
+        _ticketOffice = ticketOffice;
+        _station = station;
+    }
 
     public void Work()
     {
@@ -25,33 +37,38 @@ class Station
         const string Info = "4";
         const string Exit = "5";
 
+        bool isWork = true;
+
         Console.WriteLine("Добро пожаловать на Московский вокзал! Что желаете сделать?");
 
-        while (true)
+        while (isWork)
         {
-            Console.WriteLine($"{Create} - Создать направление\n{Sell} - Продать билеты\n{Send} - Отправка\n{Info} - План поездов\n{Exit} - Выход");
+            Console.WriteLine($"{Create} - Создать направление" +
+                              $"\n{Sell} - Продать билеты\n{Send} - Отправка" +
+                              $"\n{Info} - План поездов\n{Exit} - Выход");
             string userInput = Console.ReadLine();
 
             switch (userInput)
             {
                 case Create:
-                    CreateDirection();
+                    _direction.CreateDirection();
                     break;
 
                 case Sell:
-                    SellTickets();
+                    _ticketOffice.SellTickets();
                     break;
 
                 case Send:
-                    SendTrain();
+                    _station.SendTrain();
                     break;
 
                 case Info:
-                    PrintCurrentInfo();
+                    _station.PrintCurrentInfo();
                     break;
 
                 case Exit:
-                    return;
+                    isWork = false;
+                    break;
 
                 default:
                     Console.WriteLine("Ошибка! Нет такой команды :(");
@@ -59,114 +76,154 @@ class Station
             }
         }
     }
+}
 
-    private void CreateDirection()
+class Station
+{
+    private List<Wagon> _wagons = new List<Wagon>();
+
+    private Direction _direction;
+    private TicketOffice _ticketOffice;
+    private TrainDepot _trainDepot;
+    private Wagon _wagon;
+
+    public Station(Direction direction, TicketOffice ticketOffice, TrainDepot trainDepot, Wagon wagon)
     {
-        Console.Write("Укажите пункт назначения: ");
-        _endpoint = Console.ReadLine();
+        _direction = direction;
+        _ticketOffice = ticketOffice;
+        _trainDepot = trainDepot;
+        _wagon = wagon;
     }
 
-    private void SellTickets()
+    public void SendTrain()
     {
-        if (_endpoint != null)
+        if (_ticketOffice.NumberPassengers != 0)
+        {
+            var train = _trainDepot.ChooseTrain();
+
+            FormTrain();
+
+            Console.WriteLine($"Поезд: {train.Name}. Отправлен в направлении: {_direction.StartPoint} - {_direction.Endpoint}." +
+                              $" Количество пассажиров: {_ticketOffice.NumberPassengers}");
+
+            _wagons.Clear();
+        }
+        else
+        {
+            Console.WriteLine("Ошибка! Поезд не может отправиться пустым.");
+        }
+    }
+
+    public void FormTrain()
+    {
+        _wagon.CreatePlaces();
+
+        int countTrainWagon = (int)Math.Ceiling((double)_ticketOffice.NumberPassengers / _wagon.Places);
+
+        for (int i = 0; i < countTrainWagon; i++)
+        {
+            _wagons.Add(new Wagon());
+        }
+
+        Console.WriteLine($"Количество вагонов состава: {_wagons.Count}\nВместимость одного вагона: {_wagon.Places}");
+    }
+
+    public void PrintCurrentInfo()
+    {
+        if (_direction.Endpoint != null && _ticketOffice.NumberPassengers != 0)
+        {
+            Console.WriteLine($"Текущее место назначения: {_direction.Endpoint}");
+            Console.WriteLine($"Текущее количество пассажиров: {_ticketOffice.NumberPassengers}");
+            Console.WriteLine($"Текущее количество вагонов состава: {_wagons.Count}");
+        }
+        else
+        {
+            Console.WriteLine("Ошибка! Текущий план поездов отсутствует.");
+        }
+    }
+}
+
+class TicketOffice
+{
+    private Random _random = new Random();
+    private Direction _direction;
+
+    public TicketOffice(Direction direction)
+    {
+        _direction = direction;
+    }
+
+    public int NumberPassengers { get; private set; }
+
+    public void SellTickets()
+    {
+        if (_direction.Endpoint != null)
         {
             int minimumPassengerCount = 1500;
             int maximumPassengerCount = 2000;
 
-            _numbersPassengers = _random.Next(minimumPassengerCount, maximumPassengerCount);
-            Console.WriteLine($"Количество пассажиров: {_numbersPassengers}");
+            NumberPassengers = _random.Next(minimumPassengerCount, maximumPassengerCount);
+            Console.WriteLine($"Количество пассажиров: {NumberPassengers}");
         }
         else
         {
             Console.WriteLine("Ошибка! Создайте направление.");
         }
     }
+}
 
-    private void SendTrain()
+class Direction
+{
+    public string StartPoint { get; private set; } = "Санкт-Петербург";
+
+    public string Endpoint { get; private set; }
+
+    public void CreateDirection()
     {
-        if (_numbersPassengers > 0)
-        {
-            string startingPoint = "Санкт-Петербург";
-
-            var randomTrain = new Train();
-
-            randomTrain.ChooseeTrain(out string train);
-
-            FormTrain();
-
-            if (_endpoint != null && _numbersPassengers != 0)
-            {
-                Console.WriteLine($"Поезд: {train}. Отправлен в направлении: {startingPoint} - {_endpoint}. Количество пассажиров: {_numbersPassengers}");
-                _endpoint = null;
-                _numbersPassengers = 0;
-                _train.Clear();
-            }
-            else
-            {
-                Console.WriteLine("Текущий план поездов отсутствует.");
-            }
-        }
-        else
-        {
-            Console.WriteLine("Поезд не может отправиться пустым!");
-        }
+        Console.Write("Укажите пункт назначения: ");
+        Endpoint = Console.ReadLine();
     }
+}
 
-    private void FormTrain()
+class TrainDepot
+{
+    private List<Train> _trains = new List<Train>
     {
-        var placesOnTrain = new Wagon();
+        new Train("Сапсан"),
+        new Train("Ласточка"),
+        new Train("Экспресс"),
+        new Train("Карелия")
+    };
 
-        placesOnTrain.CreatePlaces(out int places);
+    private Random _random = new Random();
 
-        int countTrainWagon = (int)Math.Ceiling((double)_numbersPassengers / places);
-
-        for (int i = 0; i < countTrainWagon; i++)
-        {
-            _train.Add(0);
-        }
-
-        Console.WriteLine($"Количество вагонов состава: {countTrainWagon}\nВместимость одного вагона: {places}");
-    }
-
-    public void PrintCurrentInfo()
+    public Train ChooseTrain()
     {
-        if (_endpoint != null && _numbersPassengers != 0)
-        {
-            Console.WriteLine($"Текущее место назначения: {_endpoint}");
-            Console.WriteLine($"Текущее количество пассажиров: {_numbersPassengers}");
-            Console.WriteLine($"Текущее количество вагонов состава: {_train.Count}");
-        }
-        else
-        {
-            Console.WriteLine("Текущий план поездов отсутствует.");
-        }
+        return _trains[_random.Next(_trains.Count)];
     }
 }
 
 class Train
 {
-    private List<string> _trains = new List<string>
+    public Train(string name)
     {
-        "Сапсан", "Ласточка", "Экспресс", "Карелия"
-    };
-
-    private Random _random = new Random();
-
-    public void ChooseeTrain(out string train)
-    {
-        train = _trains[_random.Next(0, _trains.Count)];
+        Name = name;
     }
+
+    public string Name { get; private set; }
 }
 
 class Wagon
 {
     private Random _random = new Random();
 
-    public void CreatePlaces(out int places)
+    public int Places { get; private set; }
+
+    public void CreatePlaces()
     {
         int _minimumPlaces = 200;
         int _maximumPlaces = 300;
 
-        places = _random.Next(_minimumPlaces, _maximumPlaces);
+        Places = _random.Next(_minimumPlaces, _maximumPlaces);
     }
 }
